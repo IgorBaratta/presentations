@@ -122,3 +122,10 @@ $$
 <!-- Note the change in the integral measure (dx versus dX). -->
 
 <!-- the Jacobian is replaced with the gradient of the spatial coordinates, determinants are expanded, divergence and curl are expressed with tensor algebra on gradients, and various products are expanded using the index notation. -->
+
+---
+## Stage 2 -  Code representation
+
+---
+## Stage 3 - IR Optimizations
+This stage examines the intermediate representation and performs optimizations.
