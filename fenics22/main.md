@@ -90,15 +90,12 @@ L = action(a, un)
 
 ## Form compiler design
 
-5 sequential "compiler passes":
+FFCx takes a form expressed in UFL and produces low-level code that assembles the form on a single cell using 5 sequential "compiler passes":
 
-<figure>
+![width:800px](Figures/ffcx_diagram.png?style=centerme)
 
-    <img src="Figures/ffcx_diagram.png" style="width:90%">
-
-</figure>
-
-<!-- -->
+<!-- A Compiler passes here can be understood as a series of expression
+transformations  -->
 <!-- by using optimization techniques that are not
 readily applicable if the code is developed by hand -->
 
@@ -121,5 +118,7 @@ $$
 $$
 
 <!-- This involves scaling the integral and the application of pullbacks on the functions (arguments and coefficients) of the form. -->
+
+<!-- Note the change in the integral measure (dx versus dX). -->
 
 <!-- the Jacobian is replaced with the gradient of the spatial coordinates, determinants are expanded, divergence and curl are expressed with tensor algebra on gradients, and various products are expanded using the index notation. -->
