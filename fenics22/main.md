@@ -5,45 +5,87 @@ paginate: true
 math: katex
 theme: uncover
 style: |
-  section {
 
+  section {
     background-color: #ccc;
     letter-spacing: 1px;
-    text-align: center;
-
+    text-align: left;
   }
   h1 {
-
     font-size: 1.3em;
     text-align: center;
-
   }
   h2 {
-
     font-size: 1.5em;
     text-align: left;
-
   }
   h3 {
-
     font-size: 1em;
     text-align: center;
     font-weight: normal;
     letter-spacing: 1px;
-
+  }
+  h6 {
+    text-align: center;
+    font-weight: normal;
+    letter-spacing: 1px;
   }
   p{
-
     text-align: left;
-    font-size: 0.8em;
+    font-size: 0.75em;
     letter-spacing: 0px;
-
   }
   img[src$="centerme"] {
    font-size: 0.8em; 
    display:block; 
    margin: 0 auto; 
   }
+  footer{
+    color: black;
+    text-align: left;
+  }
+  ul {
+    padding: 10;
+    margin: 0;
+  }
+  ul li {
+    color: darkblue;
+    margin: 5px;
+    font-size:30px
+  }
+  /* Code */
+  pre, code, tt {
+    font-size: 0.98em;
+    font-size: 20px;
+    font-family: Consolas, Courier, Monospace;
+  }
+
+  code, tt {
+    margin: 0px;
+    padding: 2px;
+    white-space: nowrap;
+    border: 1px solid #eaeaea;
+    border-radius: 3px;
+  }
+
+  pre {
+    background-color: #f8f8f8;
+    overflow: auto;
+    padding: 6px 10px;
+    border-radius: 3px;
+  }
+
+  pre code, pre tt {
+    background-color: transparent;
+    border: none;
+    margin: 0;
+    padding: 0;
+    white-space: pre;
+    border: none;
+    background: transparent;
+  }
+
+
 
 ---
 
@@ -51,16 +93,18 @@ style: |
 
 ### Igor Baratta, Jørgen Dokken, Chris Richardson, Garth Wells
 
-&nbsp; 
+<br>
 
 ![width:300px](Figures/cambridge_logo.png?style=centerme)
 
----
+<br>
 
+###### ia397@cam.ac.uk
+
+---
 ## Helmholtz equation in UFL
 
-<!-- UFL is an embedded domain-specific language for the description of the weak form and discretized function spaces of finite element problems. It is embedded in Python. -->
-<font size="6">
+<font size="5.6px">
 
 ```python
 from ufl import *
@@ -77,7 +121,7 @@ u = TrialFunction(V)
 v = TestFunction(V)
 
 # Bilinear form
-a = inner(grad(u), grad(v))*dx - k2*inner(u, v)
+a = inner(grad(u), grad(v))*dx - k2*inner(u, v)*dx
 
 # Compute the action of the form on a coefficient
 un = Coefficient(V)
@@ -86,36 +130,52 @@ L = action(a, un)
 
 </font>
 
+<!-- _footer: "1. Alnæs, Martin S., et al. 'Unified form language: A domain-specific language for weak formulations of partial differential equations.' ACM Transactions on Mathematical Software (TOMS) 40.2 (2014): 1-37 " -->
+
+<!-- In Dolfinx, the users define the problem in Unified Form Language (UFL) (Alnæs et al., 2014) which captures the weak form and the function space discretization, then the form compiler takes this high-level expression and generates efficient low code.  -->
+
+<!-- UFL is an embedded domain-specific language for the description of the weak form and discretized function spaces of finite element problems. It is embedded in Python. -->
+
 ---
 
+## Assemble Matrix
+![width:800px](Figures/matrix.png?style=centerme)
+
+---
+## Compute Action
+![width:800px](Figures/action.png?style=centerme)
+
+
+---
 ## Form compiler design
 
 FFCx takes a form expressed in UFL and produces low-level code that assembles the form on a single cell using 5 sequential "compiler passes":
 
 ![width:800px](Figures/ffcx_diagram.png?style=centerme)
 
+<!-- _footer: "2. https://github.com/FEniCS/ffcx/" -->
+
 <!-- A Compiler passes here can be understood as a series of expression
-transformations  -->
-<!-- by using optimization techniques that are not
-readily applicable if the code is developed by hand -->
+transformations, and it allows us to appply some optimization techniques that are not readily applicable if the code is developed by hand or otherwise it would be a boring task.  -->
+
 
 ---
 
 ## Stage 1 -  Analysis
 
 This stage preprocesses the UFL form and extracts form metadata, such as elements, coefficients, and the cell type. 
-
-<!-- One can have multiple elements in a single form. Multiple coefficients, but at the moment each kernel supports a single cell type -->
-
-It may also perform simplifications on the form, for example:
+It also involves scaling the integral and the application of pullbacks:
 <br>
 $$
-\int \nabla u \cdot \nabla v ~\mathrm{d}x
+\int_K \nabla u \cdot \nabla v ~\mathrm{d}x - \int_K k^2 u \cdot v ~\mathrm{d}x
 $$
 becomes
 $$
-\int J^{-T}\nabla \tilde{u} \cdot J^{-T} \nabla \tilde{v} |J| ~\mathrm{d}X
+\int_{\tilde{K}} J^{-T}\nabla \tilde{u} \cdot J^{-T} \nabla \tilde{v}~|J| ~\mathrm{d}X + \int_{\tilde{K}} \tilde{u} \cdot \tilde{v} ~ |J| ~\mathrm{d}X
 $$
+<br>
+
+A later pass may replace $J$ with the evaluation of $\nabla x$.
 
 <!-- This involves scaling the integral and the application of pullbacks on the functions (arguments and coefficients) of the form. -->
 
@@ -124,8 +184,110 @@ $$
 <!-- the Jacobian is replaced with the gradient of the spatial coordinates, determinants are expanded, divergence and curl are expressed with tensor algebra on gradients, and various products are expanded using the index notation. -->
 
 ---
+
 ## Stage 2 -  Code representation
 
+This stage includes generation of finite element basis functions, extraction of data for mapping of degrees of freedom. When the basis function and quadrature rule have a tensor-product structure, only 1d basis functions and its derivatives are generated:
+$$
+
+    \phi_{i}\left(\mathbf{x}_q\right) = \psi_{i_0}\left(x_{q_0}\right) \cdot \psi_{i_1}\left(x_{q_1}\right)
+
+$$
+$$
+
+    D_x\phi_{i}\left(\mathbf{x}_q\right) = \psi'_{i_0}\left(x_{q_0}\right) \cdot \psi_{i_1}\left(x_{q_1}\right)
+
+$$
+$$
+
+    D_y\phi_{i}\left(\mathbf{x}_q\right) = \psi_{i_0}\left(x_{q_0}\right) \cdot \psi'_{i_1}\left(x_{q_1}\right)
+
+$$
+
+<!-- _footer: "3. Scroggs, M. W., Baratta, I. A., Richardson, C. N., & Wells, G. N. (2022). Basix: a runtime finite element basis evaluation library. Journal of Open Source Software, 7(73), 3982." -->
 ---
+
 ## Stage 3 - IR Optimizations
+
 This stage examines the intermediate representation and performs optimizations.
+
+- In FFC the goal was to reduce the number of operations.
+- In FFCx the goal is to increase throughput through a better use of the computing architecture.
+
+<br>
+
+Modern computer architectures have become more complicated and not all flop reduction techniques improve throughput.
+
+---
+## What is vectorization?
+```c++
+for (int i = 0; i < n; i++)
+    c[i] = a[i] + b[i];
+```
+ 
+![width:800px](Figures/vectorization.png?style=centerme)
+
+- Naïve implementation usually achieves <10% peak performance.
+---
+
+### Loop invariant code motion 
+```c++
+for (int i = 0; i < 8; ++i)
+  for (int j = 0; j < 8; ++j)
+    A[i][j] += fw[iq] * phi[iq][i] * phi[iq][j];
+```
+<center> ⬇ </center>
+
+```c++
+for (int i = 0; i < 8; ++i)
+  double ti = fw[iq] * phi[iq][i];
+  for (int j = 0; j < 8; ++j)
+    A[i][j] += phi[iq][j] * ti;
+```
+<center> ⬇ </center>
+
+```c++
+for (int i = 0; i < 8; ++i)
+  t0[i] = fw[iq] * phi[iq][i];
+for (int i = 0; i < 8; ++i)
+  for (int j = 0; j < 8; ++j)
+    A[i][j] += phi[iq][j] * t0[i];
+```
+
+
+
+<!-- the calculation of fw[iq] * phi[iq][i] is independent of the inner loop, thus it need not be repeated for all j.  -->
+
+---
+### Eliminate operations on zeros
+```c++
+    static const double phi[4][6] =
+        { { 0.0, 0.2, 0.0, 0.2, 0.2, 0.4 },
+          { 0.0, 0.5, 0.0, 0.5, 0.0, 0.0 },
+          { 0.0, 0.1, 0.0, 0.7, 0.1, 0.1 },
+          { 0.0, 0.7, 0.0, 0.2, 0.1, 0.1 } };
+```
+
+```c++
+double w[iq] = {0};
+for (int iq = 0; iq < 4; ++iq)
+  for (int id = 0; id < 6; ++id)
+    w[iq] += phi[iq][j] * u[id];
+```
+<center> ⬇ </center>
+
+```c++
+for (int id = 1; id < 2; ++id)
+  w[iq] += phi[iq][j] * u[id];
+for (int id = 3; id < 4; ++id)
+  w[iq] += phi[iq][id] * u[id];
+```
+
+- 33% flop reduction
+
+---
+### Loop fusion
+<!-- merge a sequence of loops into one loop -->
+
+---
+### Tensor contractions as matrix matrix multiplication
