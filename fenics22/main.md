@@ -49,7 +49,7 @@ style: |
     margin: 0;
   }
   ul li {
-    color: darkblue;
+    color: black;
     margin: 5px;
     font-size:30px
   }
@@ -110,10 +110,10 @@ style: |
 from ufl import *
 
 # An abstract mesh of hexahedral cells
-mesh = Mesh(VectorElement("Lagrange", hexahedron, 2))
+mesh = Mesh(VectorElement("Lagrange", tetrahedron, 1))
 
 # 6th order element to reduce pollution error
-element = FiniteElement("Lagrange", hexahedron, 6)
+element = FiniteElement("Lagrange", tetrahedron, 6)
 V = FunctionSpace(mesh, element)
 
 # Trial and test functions
@@ -228,6 +228,17 @@ for (int i = 0; i < n; i++)
 ![width:800px](Figures/vectorization.png?style=centerme)
 
 - Naïve implementation usually achieves <10% peak performance.
+- AVX2 introduced in 2013 and AVX512  in 2016.
+
+---
+## Vectorization efficiency trend 
+
+
+
+![width:566px](Figures/efficiency.png?style=centerme)
+
+- GCC 10 released in 2018
+
 ---
 
 ### Loop invariant code motion 
@@ -283,11 +294,95 @@ for (int id = 3; id < 4; ++id)
   w[iq] += phi[iq][id] * u[id];
 ```
 
-- 33% flop reduction
+- 33% flop reduction, however it prevents other optimizations.
 
 ---
 ### Loop fusion
 <!-- merge a sequence of loops into one loop -->
 
+```c++
+for (int iq = 0; iq < Nq; ++iq){
+  for (int id = 0; id < Nd; ++id)
+    w_0[iq] += dphi_x[iq][j] * u[id];
+  for (int id = 0; id < Nd; ++id)
+    w_1[iq] += dphi_y[iq][j] * u[id];
+}
+```
+<center> ⬇ </center>
+
+```c++
+for (int iq = 0; iq < Nq; ++iq){
+  for (int id = 0; id < Nd; ++id){
+    w_0[iq] += dphi_x[iq][j] * u[id];
+    w_1[iq] += dphi_y[iq][j] * u[id];
+  }
+}
+```
+- Reduces loop control overhead
+- Improves data locality
+
 ---
 ### Tensor contractions as matrix matrix multiplication
+
+$$
+C_{abc} = \sum_k A_{ka} B_{kbc}
+$$
+
+Naive code:
+
+```c++
+for (int a = 0; a < na; a++)
+  for (int b = 0; b < nb; b++)
+    for (int c = 0; c < nc; c++)
+      for (int k = 0; k < nk; k++)
+        C[a][b][c] += A[k][a] * B[k][b][c];
+```
+
+- $n_a, n_b, n_c, n_k \approx P$
+- Compiler: vectorization not profitable!
+
+---
+### Tensor contractions as matrix matrix multiplication
+
+$$
+C[a,\{b,c\}] = A[a, k] B[k, \{b,c\}]
+$$
+
+$$
+d = \{b,c\}
+$$
+
+```c++
+for (int a = 0; a < na; a++)
+  for (int k = 0; k < nk; k++)
+    for (int d = 0; d < nb*nd; d++)
+        C[a][d] += A[k][a] * B[k][d];
+```
+
+- $nd \approx P^2$, increase inner loop range
+- Improves access pattern (unit stride access pattern)
+
+---
+
+## Stage 2 Code Generation: <br> Results
+---
+### Tetrahedral mesh
+
+![width:1000px](Figures/tetrahedron.png?style=centerme)
+
+---
+
+### Hexahedral mesh
+
+![width:1000px](Figures/hex.png?style=centerme)
+
+---
+
+## Conclusions and Outlook
+
+- Modern compilers don't do witchcraft:
+  - we need to write sensible (simple) code to get sensible (high) performance.
+- We can exceed 40% of theoretical peak performance,  with portable code.
+- Road to GPUs
+  - Performance model takes different architectures into account
+  - But different optimizations might be required (eg.: bank conflicts)
