@@ -1,5 +1,5 @@
 ---
-marp: false
+marp: true
 class: lead
 paginate: true
 math: katex
@@ -386,3 +386,7 @@ for (int a = 0; a < na; a++)
 - Road to GPUs
   - performance model takes different architectures into account
   - but different optimizations might be required (eg.: bank conflicts, coalesced memory access)
+
+<br>
+
+https://github.com/IgorBaratta/local_operator
