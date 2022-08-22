@@ -1,5 +1,5 @@
 ---
-marp: true
+marp: false
 class: lead
 paginate: true
 math: katex
@@ -359,7 +359,7 @@ for (int a = 0; a < na; a++)
         C[a][d] += A[k][a] * B[k][d];
 ```
 
-- $nd \approx P^2$, increase inner loop range
+- $n_d \approx P^2$, increase inner loop range
 - Improves access pattern (unit stride access pattern)
 
 ---
@@ -381,8 +381,8 @@ for (int a = 0; a < na; a++)
 ## Conclusions and Outlook
 
 - Modern compilers don't do witchcraft:
-  - we need to write sensible (simple) code to get sensible (high) performance.
-- We can exceed 40% of theoretical peak performance,  with portable code.
+  - we need to write sensible (simple) code to get sensible (high) performance,
+- we can exceed 40% of theoretical peak performance,  with portable code.
 - Road to GPUs
-  - Performance model takes different architectures into account
-  - But different optimizations might be required (eg.: bank conflicts)
+  - performance model takes different architectures into account
+  - but different optimizations might be required (eg.: bank conflicts, coalesced memory access)
