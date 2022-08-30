@@ -7,33 +7,46 @@ theme: uncover
 style: |
 
   section {
+
     background-color: #ccc;
     letter-spacing: 1px;
     text-align: left;
+
   }
   h1 {
+
     font-size: 1.3em;
     text-align: center;
+
   }
   h2 {
+
     font-size: 1.5em;
     text-align: left;
+
   }
   h3 {
+
     font-size: 1em;
+
     text-align: center;
     font-weight: normal;
     letter-spacing: 1px;
+
   }
   h6 {
+
     text-align: center;
     font-weight: normal;
     letter-spacing: 1px;
+
   }
   p{
+
     text-align: left;
     font-size: 0.75em;
     letter-spacing: 0px;
+
   }
   img[src$="centerme"] {
    font-size: 0.8em; 
@@ -41,41 +54,54 @@ style: |
    margin: 0 auto; 
   }
   footer{
+
     color: black;
     text-align: left;
+
   }
   ul {
+
     padding: 10;
     margin: 0;
+
   }
   ul li {
+
     color: black;
     margin: 5px;
     font-size:30px
+
   }
   /* Code */
   pre, code, tt {
+
     font-size: 0.98em;
     font-size: 20px;
     font-family: Consolas, Courier, Monospace;
+
   }
 
   code, tt {
+
     margin: 0px;
     padding: 2px;
     white-space: nowrap;
     border: 1px solid #eaeaea;
     border-radius: 3px;
+
   }
 
   pre {
+
     background-color: #f8f8f8;
     overflow: auto;
     padding: 6px 10px;
     border-radius: 3px;
+
   }
 
   pre code, pre tt {
+
     background-color: transparent;
     border: none;
     margin: 0;
@@ -83,9 +109,8 @@ style: |
     white-space: pre;
     border: none;
     background: transparent;
+
   }
-
-
 
 ---
 
@@ -102,7 +127,20 @@ style: |
 ###### ia397@cam.ac.uk
 
 ---
+
 ## Helmholtz equation in UFL
+
+<!-- In FEniCSx, the users define the problem in Unified Form Language (UFL) (Alnæs et al., 2014) which captures the weak form and the function space discretization, then the form compiler takes this high-level expression and generates efficient low code.  -->
+
+<!-- Our starting point is again the Helmholtz problem that we discussed in our quick tutorial.
+Here we've got a description of our problem using UFL. But we still need something to translate this UFL file into actual code that can be executed by a computer.
+We start by creating an abstract mesh, here we use a tetrahedral cells because we want to compare to legacy form compiler, but the new form compiler ffcx also supports hexahedral and high order geometry.
+Then we define our function space. Here we use a high order to reduce pollution error.
+
+Pollution error affects wave problems and it's a type of discretisation error, such as numerical dissipation and dispersion error.  
+
+Now we write our bilinear or sesquilinear form, and we want to generate a kernel for assembling a matrix using this expression.
+We can also create a kernel to compute the action of this form directly without assembling a matrix.-->
 
 <font size="5.6px">
 
@@ -132,21 +170,33 @@ L = action(a, un)
 
 <!-- _footer: "1. Alnæs, Martin S., et al. 'Unified form language: A domain-specific language for weak formulations of partial differential equations.' ACM Transactions on Mathematical Software (TOMS) 40.2 (2014): 1-37 " -->
 
-<!-- In Dolfinx, the users define the problem in Unified Form Language (UFL) (Alnæs et al., 2014) which captures the weak form and the function space discretization, then the form compiler takes this high-level expression and generates efficient low code.  -->
-
 <!-- UFL is an embedded domain-specific language for the description of the weak form and discretized function spaces of finite element problems. It is embedded in Python. -->
 
 ---
 
 ## Assemble Matrix
+
 ![width:800px](Figures/matrix.png?style=centerme)
 
+* Cube mesh (1M tetrahedral cells)
+
+<!-- So now let's have a look at the time to assemble the matrix that represents our form.
+We use both the legacy and the new form compiler and we can see a factor of about 15x times.
+For assembling a matrix with 1 million cells it takes more than 50 seconds with the legacy 
+compiler and 3 seconds with the new one.
+The thing is that both form compilers generate c++ code, so what's the difference? -->
 ---
+
 ## Compute Action
+
 ![width:800px](Figures/action.png?style=centerme)
 
+* Cube mesh (1M tetrahedral cells)
 
+<!-- A more interesting example is computing th action of a to a vector using a matrix free approach.
+Now we see a 6x times speedup. and why is that?   -->
 ---
+
 ## Form compiler design
 
 FFCx takes a form expressed in UFL and produces low-level code that assembles the form on a single cell using 5 sequential "compiler passes":
@@ -157,7 +207,6 @@ FFCx takes a form expressed in UFL and produces low-level code that assembles th
 
 <!-- A Compiler passes here can be understood as a series of expression
 transformations, and it allows us to appply some optimization techniques that are not readily applicable if the code is developed by hand or otherwise it would be a boring task.  -->
-
 
 ---
 
@@ -211,29 +260,33 @@ $$
 
 This stage examines the intermediate representation and performs optimizations.
 
-- In FFC the goal was to reduce the number of operations.
-- In FFCx the goal is to increase throughput through a better use of the computing architecture.
+* In FFC the goal was to reduce the number of operations.
+* In FFCx the goal is to increase throughput through a better use of the computing architecture.
 
 <br>
 
 Modern computer architectures have become more complicated and not all flop reduction techniques improve throughput.
 
 ---
+
 ## What is vectorization?
+
 ```c++
 for (int i = 0; i < n; i++)
+
     c[i] = a[i] + b[i];
+
 ```
  
+
 ![width:800px](Figures/vectorization.png?style=centerme)
 
 - Naïve implementation usually achieves <10% peak performance.
 - AVX2 introduced in 2013 and AVX512  in 2016.
 
 ---
+
 ## Vectorization efficiency trend 
-
-
 
 ![width:566px](Figures/efficiency.png?style=centerme)
 
@@ -242,18 +295,22 @@ for (int i = 0; i < n; i++)
 ---
 
 ### Loop invariant code motion 
+
 ```c++
 for (int i = 0; i < 8; ++i)
   for (int j = 0; j < 8; ++j)
     A[i][j] += fw[iq] * phi[iq][i] * phi[iq][j];
 ```
+
 <center> ⬇ </center>
 
 ```c++
 for (int i = 0; i < 8; ++i)
-  double ti = fw[iq] * phi[iq][i];
+  double ti = fw[iq] * phi[iq][i]; 
   for (int j = 0; j < 8; ++j)
+
     A[i][j] += phi[iq][j] * ti;
+
 ```
 <center> ⬇ </center>
 
@@ -265,18 +322,20 @@ for (int i = 0; i < 8; ++i)
     A[i][j] += phi[iq][j] * t0[i];
 ```
 
-
-
 <!-- the calculation of fw[iq] * phi[iq][i] is independent of the inner loop, thus it need not be repeated for all j.  -->
 
 ---
+
 ### Eliminate operations on zeros
+
 ```c++
+
     static const double phi[4][6] =
         { { 0.0, 0.2, 0.0, 0.2, 0.2, 0.4 },
           { 0.0, 0.5, 0.0, 0.5, 0.0, 0.0 },
           { 0.0, 0.1, 0.0, 0.7, 0.1, 0.1 },
           { 0.0, 0.7, 0.0, 0.2, 0.1, 0.1 } };
+
 ```
 
 ```c++
@@ -285,19 +344,23 @@ for (int iq = 0; iq < 4; ++iq)
   for (int id = 0; id < 6; ++id)
     w[iq] += phi[iq][j] * u[id];
 ```
+
 <center> ⬇ </center>
 
 ```c++
 for (int id = 1; id < 2; ++id)
-  w[iq] += phi[iq][j] * u[id];
+  w[iq] += phi[iq][j] * u[id]; 
 for (int id = 3; id < 4; ++id)
-  w[iq] += phi[iq][id] * u[id];
+  w[iq] += phi[iq][id] * u[id]; 
+
 ```
 
 - 33% flop reduction, however it prevents other optimizations.
 
 ---
+
 ### Loop fusion
+
 <!-- merge a sequence of loops into one loop -->
 
 ```c++
@@ -308,20 +371,25 @@ for (int iq = 0; iq < Nq; ++iq){
     w_1[iq] += dphi_y[iq][j] * u[id];
 }
 ```
+
 <center> ⬇ </center>
 
 ```c++
 for (int iq = 0; iq < Nq; ++iq){
   for (int id = 0; id < Nd; ++id){
+
     w_0[iq] += dphi_x[iq][j] * u[id];
     w_1[iq] += dphi_y[iq][j] * u[id];
+
   }
 }
+
 ```
 - Reduces loop control overhead
 - Improves data locality
 
 ---
+
 ### Tensor contractions as matrix matrix multiplication
 
 $$
@@ -338,34 +406,39 @@ for (int a = 0; a < na; a++)
         C[a][b][c] += A[k][a] * B[k][b][c];
 ```
 
-- $n_a, n_b, n_c, n_k \approx P$
-- Compiler: vectorization not profitable!
+* $n_a, n_b, n_c, n_k \approx P$
+* Compiler: vectorization not profitable!
 
 ---
+
 ### Tensor contractions as matrix matrix multiplication
 
 $$
-C[a,\{b,c\}] = A[a, k] B[k, \{b,c\}]
+C[a, \{b, c\}] = A[a, k] B[k, \{b, c\}]
 $$
 
 $$
-d = \{b,c\}
+d = \{b, c\}
 $$
 
 ```c++
 for (int a = 0; a < na; a++)
   for (int k = 0; k < nk; k++)
+
     for (int d = 0; d < nb*nd; d++)
         C[a][d] += A[k][a] * B[k][d];
+
 ```
 
-- $n_d \approx P^2$, increase inner loop range
-- Improves access pattern (unit stride access pattern)
+* $n_d \approx P^2$, increase inner loop range
+* Improves access pattern (unit stride access pattern)
 
 ---
 
 ## Stage 2 Code Generation: <br> Results
+
 ---
+
 ### Tetrahedral mesh
 
 ![width:1000px](Figures/tetrahedron.png?style=centerme)
@@ -380,12 +453,12 @@ for (int a = 0; a < na; a++)
 
 ## Conclusions and Outlook
 
-- Modern compilers don't do witchcraft:
-  - we need to write sensible (simple) code to get sensible (high) performance,
-- we can exceed 40% of theoretical peak performance,  with portable code.
-- Road to GPUs
-  - performance model takes different architectures into account
-  - but different optimizations might be required (eg.: bank conflicts, coalesced memory access)
+* Modern compilers don't do witchcraft:
+  + we need to write sensible (simple) code to get sensible (high) performance, 
+* we can exceed 40% of theoretical peak performance, with portable code.
+* Road to GPUs
+  + performance model takes different architectures into account
+  + but different optimizations might be required (eg.: bank conflicts, coalesced memory access)
 
 <br>
 
